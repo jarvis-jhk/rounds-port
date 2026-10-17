@@ -81,7 +81,9 @@ target/debug/rounds-port --map-viewer [--map N] [--size 1280x720] [--fullscreen]
   package): `crates/game/build.rs` adds `tools/lib` (a symlink created by
   `scripts/bootstrap-tools.sh`) to the link path; `ROUNDS_SDL2_LIB_DIR`
   overrides it. The binary's `NEEDED` entry is the soname, so it runs
-  against any SDL >= 2.26 on the system.
+  against any SDL >= 2.0.20 (Ubuntu 22.04, the CI build host). Functions
+  newer than that (`SDL_GetWindowSizeInPixels`, `SDL_JoystickAttachVirtualEx`)
+  are looked up at run time (`platform::sdl_optional_fn`) with a fallback.
 - `WGPU_BACKEND=vulkan|gl`, `WGPU_ADAPTER_NAME=llvmpipe` (software, useful
   for CI; a case-insensitive substring of the adapter name, honoured by
   `Gpu::new`) and `WGPU_POWER_PREF` select the GPU. `ROUNDS_NO_BLOOM=1`

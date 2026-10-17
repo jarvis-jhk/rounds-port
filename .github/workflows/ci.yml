@@ -103,6 +103,7 @@ jobs:
       - name: Sanity-check the executable
         run: |
           zip=$(ls dist/rounds-port-*-windows-x86_64.zip)
+          mkdir -p scratch
           unzip -q "$zip" -d scratch/win
           exe=$(ls scratch/win/rounds-port-*/rounds-port.exe)
           file "$exe" | grep -q 'PE32+ executable.*x86-64'

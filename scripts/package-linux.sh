@@ -12,7 +12,7 @@
 #                 because Steam needs it); a bundled copy built against the build
 #                 host's X11/Wayland/audio libraries is often worse than the
 #                 system's own. The binary's NEEDED entry is the soname, so it
-#                 runs against any SDL2 >= 2.26.
+#                 runs against any SDL2 >= 2.0.20.
 #   --no-build    reuse target/release/rounds-port
 #   --verify      unpack the archive into scratch/ and smoke-test it
 #
