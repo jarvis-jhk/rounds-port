@@ -199,3 +199,14 @@ Open an issue at <https://github.com/jarvis-jhk/rounds-port/issues> with the
 version (name of the archive), your system and graphics driver, and the output
 of `rounds-port --list-devices`. Do not attach game files or screenshots that
 show the original's artwork beyond what is needed to describe the problem.
+
+### Crash reports
+
+If the game crashes (a Rust panic), it sends one short, anonymous report to
+the project's public [ntfy](https://ntfy.sh) topic, from which a GitHub
+Action files an issue labelled `crash`. The report holds the version, the
+operating system and architecture, the panic message and location and a
+backtrace of the program; your home folder and user name are removed, and
+nothing about your machine, your game files or the match is sent. The same
+text is saved as `last-crash.txt` in the data folder. Turn it off with the
+environment variable `ROUNDS_PORT_CRASH_REPORTS=0`.

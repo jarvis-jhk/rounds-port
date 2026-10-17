@@ -64,6 +64,7 @@ the Windows cross-build, the online dev server and netsim, packaging and CI.
 | [docs/platform.md](docs/platform.md) | Platform layer, renderer, local match |
 | [docs/net.md](docs/net.md) | Online play, rollback, test results |
 | [docs/STATUS.md](docs/STATUS.md) | Milestones and what is next |
+| [ROADMAP.md](ROADMAP.md) | Current priorities |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | Third-party licenses |
 
 The project is clean-room: behaviour is described in our own words in

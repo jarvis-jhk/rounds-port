@@ -1,0 +1,29 @@
+# Turns crash reports from the game (crates/game/src/crash.rs, posted to a
+# public ntfy topic) into GitHub issues labelled `crash`: one issue per
+# fingerprint, a comment for every further report of it.
+name: Crash reports
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: crash-reports
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - run: python3 -I .github/scripts/crash_reports.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}

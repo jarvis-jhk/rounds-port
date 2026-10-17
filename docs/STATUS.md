@@ -77,8 +77,10 @@ Living plan. Update when a step finishes.
 
 - M11: published 2026-10-17 as github.com/jarvis-jhk/rounds-port (v0.1.0
   prerelease, built on the dev laptop) with the Warpzone descriptor
-  (`games/rounds-port.toml` in jarvis-jhk/warpzone). Next: a green CI run and
-  the first release built by `release.yml`.
+  (`games/rounds-port.toml` in jarvis-jhk/warpzone). CI green and v0.1.0
+  rebuilt by `release.yml` (b9b2791). Priorities: `ROADMAP.md`.
+- Crash reports: `crates/game/src/crash.rs` (panic hook → public ntfy topic)
+  and `.github/workflows/crash-reports.yml` (topic → issues labelled `crash`).
 - Feel pass against the original (needs reference footage or the OK above).
 - macOS port (wgpu Metal + SDL2 framework).
 - Gaps: chromatic aberration, particle trails/collision, right-keyboard aim

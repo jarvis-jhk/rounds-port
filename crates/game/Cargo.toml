@@ -25,3 +25,4 @@ glam.workspace = true
 anyhow.workspace = true
 log.workspace = true
 pollster.workspace = true
+ureq.workspace = true

@@ -13,6 +13,7 @@ mod app;
 mod art;
 mod audio;
 mod boot;
+mod crash;
 mod data;
 mod demo;
 mod faces;
@@ -166,6 +167,8 @@ struct Args {
     launch: Vec<String>,
     virtual_pads: Option<PathBuf>,
     version: bool,
+    /// Hidden: panic on purpose (tests the crash report path).
+    crash_test: bool,
     fx_preview: Option<String>,
     pick_mode: Option<settings::PickModeSetting>,
 }
@@ -195,6 +198,7 @@ fn parse_args(mut it: impl Iterator<Item = String>) -> Result<Option<Args>> {
             "--fps-cap" => a.fps_cap = Some(value("--fps-cap")?.parse()?),
             "--play-ogg" => a.play = Some(value("--play-ogg")?.into()),
             "--list-devices" => a.list_devices = true,
+            "--crash-test" => a.crash_test = true,
             "--map" => a.map = Some(value("--map")?),
             "--art" => a.art = Some(value("--art")?.parse()?),
             "--map-sheet" => a.map_sheet = Some(value("--map-sheet")?.into()),
@@ -432,6 +436,7 @@ fn main() -> Result<()> {
     #[cfg(all(windows, not(debug_assertions)))]
     console::attach();
     init_logging();
+    crash::install();
     let Some(args) = parse_args(std::env::args().skip(1))? else {
         print!("{USAGE}");
         return Ok(());
@@ -439,6 +444,9 @@ fn main() -> Result<()> {
     if args.version {
         println!("rounds-port {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
+    }
+    if args.crash_test {
+        panic!("crash test requested with --crash-test");
     }
     if args.list_devices {
         return list_devices();

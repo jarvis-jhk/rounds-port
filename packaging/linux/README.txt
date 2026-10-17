@@ -21,7 +21,7 @@ Requirements
 ------------
 - 64-bit Linux with glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fedora 36+,
   SteamOS 3 / Steam Deck).
-- SDL2 2.26 or newer (libSDL2-2.0.so.0). Steam Deck and nearly every desktop
+- SDL2 2.0.20 or newer (libSDL2-2.0.so.0). Steam Deck and nearly every desktop
   already have it.
 - A Vulkan driver (or OpenGL as fallback): Mesa (AMD, Intel), NVIDIA proprietary.
   WGPU_BACKEND=gl ./play.sh forces OpenGL, WGPU_BACKEND=vulkan forces Vulkan.
