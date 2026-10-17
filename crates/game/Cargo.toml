@@ -1,0 +1,27 @@
+[package]
+name = "rounds-port"
+description = "rounds-port game binary: SDL2 platform layer (window, input, audio), app loop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "rounds-port"
+path = "src/main.rs"
+
+[dependencies]
+rounds-render.workspace = true
+rounds-import.workspace = true
+rounds-sim.workspace = true
+rounds-content.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+rounds-net.workspace = true
+bytemuck.workspace = true
+sdl2.workspace = true
+lewton.workspace = true
+wgpu.workspace = true
+glam.workspace = true
+anyhow.workspace = true
+log.workspace = true
+pollster.workspace = true

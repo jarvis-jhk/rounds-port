@@ -1,0 +1,76 @@
+# rounds-port — a clean-room Rust reimplementation of ROUNDS (Landfall, 2021).
+# Tier 2: the game links warpzone-core directly (crates/net): host screen,
+# room browser, codes, invite links, --warpzone-join/--warpzone-host, rollback
+# netcode (GGRS) over Warpzone's encrypted peer channels, any mix of local and
+# online players up to 12. Validate with
+#   warpzone-server check-games packaging/warpzone
+id = "rounds-port"
+name = "ROUNDS (rounds-port)"
+tagline = "The 1 vs 1 card-drafting shooter, rebuilt: up to 12 players on one screen or online, with rollback."
+description = """
+An open-source, clean-room reimplementation of ROUNDS for Linux and Windows. Every sprite, sound, map and card is loaded from your own copy of the game; nothing of the original is included or downloaded.
+
+Up to twelve players in any mix: twelve on one screen with controllers, twelve machines online, or several couches against each other. Free-for-all or teams of any split, every round decided by the cards you pick.
+
+Warpzone brings public and private rooms, join codes, invite links and NAT traversal; online play uses rollback netcode, so remote players feel as responsive as local ones."""
+homepage = "https://github.com/jarvis-jhk/rounds-port"
+accent = "#e8603c"
+motif = "arena"
+tier = 2
+local_players = 12
+third_party = false
+status = "in development"
+requires = "your own copy of ROUNDS (Steam) — rounds-port imports its assets at first start"
+
+[install]
+github = "jarvis-jhk/rounds-port"
+prerelease = true
+checksums = "SHA256SUMS"
+assets = { linux = "rounds-port-*-linux-x86_64.tar.gz", deck = "rounds-port-*-linux-x86_64.tar.gz", windows = "rounds-port-*-windows-x86_64.zip" }
+
+[launch]
+# Linux: play.sh (sets LD_LIBRARY_PATH to the bundled lib/ if there is one, then
+# execs the binary with every argument). Windows: the exe, SDL2.dll beside it.
+exec = { linux = "rounds-port-*/play.sh", deck = "rounds-port-*/play.sh", windows = "rounds-port-*/rounds-port.exe" }
+join = ["--warpzone-join", "{room}"]
+host = ["--warpzone-host"]
+
+[rooms]
+# Members (machines). Player slots are counted by the game: at most 12 in
+# total, any number of them local to one machine.
+max_players = 12
+presets = [
+  { id = "ffa", label = "free-for-all" },
+  { id = "teams", label = "teams" },
+]
+display = [
+  { key = "players", label = "Players" },
+  { key = "mode", label = "Mode" },
+  { key = "map", label = "Map" },
+]
+
+# The launcher looks for a ROUNDS install (Steam libraries, Proton and Wine
+# prefixes, Downloads, ...) and hands it over twice: as WARPZONE_DATA_ROUNDS on
+# every start, and once through import_args (`rounds-port --import --game DIR`,
+# which converts the data and exits) until `present` exists. The import lives in
+# the game's user data dir as import-v<FORMAT_VERSION>/ (crates/import,
+# `FORMAT_VERSION`); bump the two `present` paths when that number changes (the
+# game re-imports by itself at its next start either way, so a stale path only
+# means the launcher runs the import once more).
+[[data]]
+id = "rounds"
+label = "ROUNDS (Steam, Windows build)"
+description = "An installed copy of ROUNDS: the folder with ROUNDS.exe and ROUNDS_Data. rounds-port reads it once and keeps its own converted copy; the install is never modified."
+files = ["ROUNDS_Data/globalgamemanagers", "./ROUNDS.exe"]
+steam = ["ROUNDS"]
+downloads = false
+discs = false
+buy = [{ label = "Steam", url = "https://store.steampowered.com/app/1557740/ROUNDS/" }]
+import_args = ["--import", "--game", "{path}"]
+# `~` is the home directory (USERPROFILE on Windows); %APPDATA% = ~/AppData/Roaming.
+# A custom XDG_DATA_HOME or ROUNDS_PORT_DATA_DIR is not seen here: harmless, the
+# import then simply runs (and returns at once) at each start.
+present = [
+  "~/.local/share/rounds-port/import-v1/index.json",
+  "~/AppData/Roaming/rounds-port/import-v1/index.json",
+]

@@ -1,0 +1,17 @@
+[package]
+name = "rounds-sim"
+description = "rounds-port deterministic, rollback-able game simulation (no I/O, no rendering)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+libm.workspace = true
+rapier2d.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[[bin]]
+name = "sim-bench"
+path = "src/bin/bench.rs"

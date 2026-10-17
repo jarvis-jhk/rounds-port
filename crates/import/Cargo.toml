@@ -1,0 +1,28 @@
+[package]
+name = "rounds-import"
+description = "Imports ROUNDS game data from a Unity install into rounds-port's own format"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "rounds-import"
+path = "src/main.rs"
+
+[[bin]]
+name = "map-sheet"
+path = "src/bin/map-sheet.rs"
+
+[dependencies]
+unity-assets = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+glam = { workspace = true }
+rayon = { workspace = true }
+png = { workspace = true }
+tiny-skia = { workspace = true }

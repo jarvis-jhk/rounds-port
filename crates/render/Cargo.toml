@@ -1,0 +1,16 @@
+[package]
+name = "rounds-render"
+description = "wgpu 2D renderer for rounds-port: batched sprites/shapes/text, soft shadows, offscreen capture"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+wgpu.workspace = true
+bytemuck.workspace = true
+fontdue.workspace = true
+png.workspace = true
+pollster.workspace = true
+glam.workspace = true
+log.workspace = true
+thiserror.workspace = true

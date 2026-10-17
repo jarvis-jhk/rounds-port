@@ -1,0 +1,15 @@
+# Toolchains, caches and build output (recreatable).
+/tools/
+/target/
+# Third-party checkouts used as references (re-clonable).
+/ext/
+# Decompiled game code and extracted game assets: never committed.
+/ref/
+/cache/
+/scratch/
+# Release archives (scripts/package-*.sh), rebuilt from source.
+/dist/
+# Backup state of the laptop this was developed on (not project data).
+/.rsync-*
+# Clean-room specs: a checkout of a private repository, never published here.
+/docs/spec/
