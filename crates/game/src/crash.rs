@@ -87,9 +87,38 @@ fn report(message: &str, location: &str, thread: &str, backtrace: &str) -> Strin
         scrub(location),
         scrub(message),
     );
-    body.push_str(&scrub(backtrace));
+    body.push_str(&scrub(&skip_panic_frames(backtrace)));
     truncate(&mut body, MAX_BODY);
     body
+}
+
+/// Drops the leading frames of the panic machinery (this hook, std, core),
+/// so the report's size limit is spent on the frames that matter.
+fn skip_panic_frames(backtrace: &str) -> String {
+    let lines: Vec<&str> = backtrace.lines().collect();
+    let is_frame = |l: &str| {
+        let t = l.trim_start();
+        t.split_once(": ")
+            .is_some_and(|(n, _)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+    };
+    let machinery = |l: &str| {
+        let name = l.trim_start().split_once(": ").map_or("", |(_, n)| n);
+        [
+            "std::",
+            "core::",
+            "alloc::",
+            "__rustc::",
+            "<alloc::",
+            "rounds_port::crash::",
+        ]
+        .iter()
+        .any(|p| name.starts_with(p))
+    };
+    let start = lines
+        .iter()
+        .position(|l| is_frame(l) && !machinery(l))
+        .unwrap_or(0);
+    lines[start..].join("\n")
 }
 
 /// Removes the home folder and the user name from `text`.
@@ -165,6 +194,12 @@ mod tests {
         assert_eq!(a.lines().next(), b.lines().next());
         let c = report("boom", "crates/game/src/a.rs:2", "main", "");
         assert_ne!(a.lines().next(), c.lines().next());
+    }
+
+    #[test]
+    fn skips_panic_machinery() {
+        let bt = "   0: rounds_port::crash::install::{closure#0}\n             at ./a.rs:1\n   6: core::panicking::panic_fmt\n   7: rounds_port::main\n             at ./main.rs:9\n";
+        assert!(skip_panic_frames(bt).starts_with("   7: rounds_port::main"));
     }
 
     #[test]
