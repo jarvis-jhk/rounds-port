@@ -17,3 +17,4 @@ items. Newest first.
 - Open: Steam Deck defaults, launcher end-to-end check, real-hardware
   session, feel pass (see ROADMAP.md).
 - Pre-push checks in the worker: fmt, clippy -D warnings, game tests, cards+stress, smoke (with real data) passed; netsim not run: `scripts/net/dev-server.sh` builds inside `ext/warpzone`, which workers must not do, and rounds-net/sim were not touched.
+- Pipeline verified end to end: `--crash-test` → ntfy → workflow → issue #1 → lane request; #1 closed as the test. CI green on fc1d51c.
