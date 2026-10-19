@@ -57,7 +57,7 @@ USAGE:
 
 OPTIONS:
     --screen NAME          Start on a menu screen: main, local, options, controls, maps,
-                           lobby, lobby12, lobby-teams, editor, register, online, host,
+                           mods, lobby, lobby12, lobby-teams, editor, register, online, host,
                            browse, code, onlinelobby, pause
     --online host|join     Headless automated online run with bot players (tests);
                            prints ROOM <id> <code> (host) and RESULT ... at the end
@@ -105,6 +105,8 @@ OPTIONS:
     --pick-mode M          Card picks: auto (together with > 3 pickers), turn (the
                            original, one after another), together (--bot-match,
                            --online host)
+    --pick-n P,H           Mod Pick N Cards (docs/MODS.md): P picks per phase, H cards
+                           per hand (--bot-match, --online host)
     --fx-preview NAMES     Headless dev scene: imported prefab particle effects by
                            root name (A_Explosion,PlayerDeath,...; all = every one)
     --virtual-pads FILE    Dev/tests: simulated controllers driven by commands
@@ -171,6 +173,20 @@ struct Args {
     crash_test: bool,
     fx_preview: Option<String>,
     pick_mode: Option<settings::PickModeSetting>,
+    /// `--pick-n`: built-in mod Pick N Cards (picks, hand size).
+    pick_n: Option<(u8, u8)>,
+}
+
+impl Args {
+    /// Built-in mods from the command line (all off without flags).
+    fn mods(&self) -> rounds_sim::Mods {
+        rounds_sim::Mods {
+            pick_n_cards: self
+                .pick_n
+                .map(|(picks, hand_size)| rounds_sim::mods::PickNCards { picks, hand_size }),
+        }
+        .sanitized()
+    }
 }
 
 fn parse_size(s: &str) -> Result<(u32, u32)> {
@@ -249,6 +265,11 @@ fn parse_args(mut it: impl Iterator<Item = String>) -> Result<Option<Args>> {
                     "together" | "simultaneous" => M::Simultaneous,
                     other => bail!("--pick-mode expects auto, turn or together, not {other:?}"),
                 })
+            }
+            "--pick-n" => {
+                let v = value("--pick-n")?;
+                let (p, h) = v.split_once(',').context("--pick-n expects PICKS,HAND")?;
+                a.pick_n = Some((p.trim().parse()?, h.trim().parse()?));
             }
             "--fx-preview" => a.fx_preview = Some(value("--fx-preview")?),
             "--virtual-pads" => a.virtual_pads = Some(value("--virtual-pads")?.into()),
@@ -553,6 +574,7 @@ fn app_options(args: &Args) -> Result<menu::AppOptions> {
             if let Some(m) = args.pick_mode {
                 rules.pick_mode = m;
             }
+            rules.mods = args.mods();
             Some(menu::online::AutoPlan {
                 host: m == "host",
                 code: args.code.clone(),
@@ -632,6 +654,7 @@ fn run_match(
         .clamp(1, rounds_sim::MAX_PLAYERS);
     let cards = args.cards.clone();
     let pick_mode = args.pick_mode.unwrap_or_default();
+    let mods = args.mods();
     let make = move |d: Rc<rounds_import::GameData>,
                      sound: bool,
                      map: Option<String>,
@@ -640,6 +663,7 @@ fn run_match(
           -> Result<play::MatchScene> {
         let content = play::build_content(&d)?;
         let mut setup = rounds_sim::MatchSetup::ffa(players, seed);
+        setup.mods = mods;
         if let Some(m) = &map {
             setup.map_rotation = vec![rounds_sim::MapId(map_scene::find_map(&d, m)? as u16)];
         }

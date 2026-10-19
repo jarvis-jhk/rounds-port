@@ -63,6 +63,7 @@ Living plan. Update when a step finishes.
 | Menus, local lobby (12 devices, teams), online driver + UI over rounds-net (M6–M8) | done (headless + windowed on Xvfb; online test matrix passes, forfeit on drop wired) |
 | Sim review fixes (`docs/spec/review/sim-vs-spec.md`, private: M1-M4, L1-L12 fixed with regression tests, specs corrected; L13 declined) + simultaneous card picks (`PickMode`, `World::set_pick_mode`, `World::pick_hands`; default Auto = simultaneous above 3 pickers) | done (sim side); presentation must draw `pick_hands()` when `simultaneous_pick()` |
 | Packaging + CI (M11 groundwork) | done: dist tarball/zip, SHA256SUMS, workflows; fmt + clippy clean workspace-wide |
+| Built-in mods (`docs/MODS.md`, ROADMAP "Popular mods, built in") | slices 1-2 done: survey of the top 20; `rounds_sim::Mods` in `MatchSetup` (serde default = all off, sent to peers inside the lobby's `MatchRules`), lobby MODS page, `--pick-n`; first mod Pick N Cards. `tests/mods.rs` pins vanilla checksums recorded before the change. Next: slice 3 (rule mods) |
 
 ## Open questions (for the owner)
 
@@ -98,7 +99,7 @@ Living plan. Update when a step finishes.
 - Windows: `scripts/fetch-windows-toolchain.sh && scripts/build-windows.sh && scripts/run-windows.sh --headless --frames 10 --screenshot scratch/win.png`.
 - Netsim: `scripts/net/dev-server.sh` (ports via ROUNDS_WZ_PORT/ROUNDS_WZ_UDP_PORT; 2998 is taken by another project) then `cargo run -p rounds-net --example netsim -- run --locals 4x3`.
 - Map screenshot: `target/debug/rounds-port --headless --map 3 --screenshot scratch/map-3.png`; sheet: `--map-sheet scratch/maps-hd.png --size 640x360`.
-- Bot match: `target/debug/rounds-port --headless --bot-match --players 12 --shots 240,1560 --screenshot scratch/m.png` (prints a final `checksum:` line; `--pick-mode together`).
+- Bot match: `target/debug/rounds-port --headless --bot-match --players 12 --shots 240,1560 --screenshot scratch/m.png` (prints a final `checksum:` line; `--pick-mode together`; mods: `--pick-n 2,7`).
 - Prefab particle effects: `target/debug/rounds-port --headless --fx-preview A_Explosion,PlayerDeath --shots 5,20 --screenshot scratch/fx.png` (`all` = every prefab).
 - Windowed on the private Xvfb: `scripts/dev/xvfb.sh` (+ `scripts/dev/xvfb-wm.sh`), then `env -u WAYLAND_DISPLAY DISPLAY=:61 SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=disk SDL_DISKAUDIOFILE=scratch/sdl-audio.raw target/debug/rounds-port [--virtual-pads FILE]`.
 - Online test with Windows: `scripts/build-windows.sh && ONLINE_TEST_WINDOWS=1 scripts/net/online-test.sh win`.

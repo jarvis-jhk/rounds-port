@@ -117,6 +117,12 @@ maps are in the rotation, and "+ BOT" / "- BOT" to fill seats with computer
 players. With many players the camera and HUD scale so everyone fits;
 twelve players on one screen are playable on a TV with a handful of pads.
 
+**Mods** opens the built-in mods: our own versions of popular community
+mods for the original, each off by default and switched on per match (online
+the host's choice applies to everyone). All off is the original game. So far:
+Pick N Cards (after the mod by Pykess) — several picks per pick phase, and up
+to ten cards per hand. More are planned (`docs/MODS.md`).
+
 ## Online (Warpzone)
 
 Online play uses [Warpzone](https://github.com/jarvis-jhk/warpzone): accounts

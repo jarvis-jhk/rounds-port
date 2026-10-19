@@ -4,7 +4,7 @@
 //!
 //! Spawn assignment for more than 4 players / teams: see [`spawn_slots`].
 
-use crate::cards::{HAND_SIZE, draw_slot};
+use crate::cards::draw_slot;
 use crate::content::{CardId, Content, MapId};
 use crate::effects::Hook;
 use crate::events::{EventKind, cue};
@@ -125,6 +125,10 @@ pub struct Flow {
     pub hands: Vec<PickHand>,
     /// The running pick phase is simultaneous.
     pub simultaneous: bool,
+    /// Further passes of this pick phase ([`crate::mods::PickNCards`]):
+    /// passes left and their pickers. Always 0 / empty in vanilla.
+    pub repicks: u8,
+    pub repickers: Vec<u8>,
 }
 
 impl Default for Flow {
@@ -142,6 +146,8 @@ impl Default for Flow {
             forfeit_end: false,
             hands: Vec::new(),
             simultaneous: false,
+            repicks: 0,
+            repickers: Vec::new(),
         }
     }
 }
@@ -186,6 +192,12 @@ impl Flow {
             h.u32(hd.selected as u32);
             h.u32(hd.picked.map_or(0xFF, |s| s as u32));
             h.bool(hd.done);
+        }
+        if self.repicks > 0 || !self.repickers.is_empty() {
+            h.u32(0x5245_0000 | self.repicks as u32);
+            for p in &self.repickers {
+                h.u32(*p as u32);
+            }
         }
     }
 }
@@ -606,6 +618,7 @@ impl World {
             .push(EventKind::PlayerDisconnected { player: i as u8 });
         // Card picks: drop its place in the queue, abort a running pick.
         self.flow.pick_queue.retain(|p| *p as usize != i);
+        self.flow.repickers.retain(|p| *p as usize != i);
         self.flow.respawns.retain(|(p, _)| *p as usize != i);
         if let Some(ps) = &mut self.flow.pick
             && ps.player as usize == i
@@ -666,6 +679,8 @@ impl World {
             _ => {
                 self.flow.pick = None;
                 self.flow.pick_queue.clear();
+                self.flow.repicks = 0;
+                self.flow.repickers.clear();
                 self.flow.hands.clear();
                 self.flow.simultaneous = false;
                 self.flow.battle = false;
@@ -716,7 +731,24 @@ impl World {
         self.flow.pick = None;
         self.flow.hands.clear();
         self.flow.simultaneous = self.rules.pick_mode.simultaneous_for(pickers.len());
+        self.flow.repicks = self.rules.mods.picks() - 1;
+        self.flow.repickers = if self.flow.repicks > 0 {
+            pickers.clone()
+        } else {
+            Vec::new()
+        };
         self.flow.pick_queue = pickers;
+    }
+
+    /// Starts the next pass of a pick phase with several picks per player
+    /// ([`crate::mods::PickNCards`]). False when there is none (vanilla).
+    fn next_pick_pass(&mut self) -> bool {
+        if self.flow.repicks == 0 || self.flow.repickers.is_empty() {
+            return false;
+        }
+        self.flow.repicks -= 1;
+        self.flow.pick_queue = self.flow.repickers.clone();
+        true
     }
 
     /// One tick of a simultaneous pick phase. Every picker runs the
@@ -725,7 +757,7 @@ impl World {
     /// player order. Returns false when every hand is done.
     fn hands_tick(&mut self, content: &Content) -> bool {
         if self.flow.hands.is_empty() {
-            if self.flow.pick_queue.is_empty() {
+            if self.flow.pick_queue.is_empty() && !self.next_pick_pass() {
                 return false;
             }
             let start = self.flow.selected;
@@ -751,6 +783,7 @@ impl World {
         }
         let first = ticks(0.2);
         let step = ticks(0.1);
+        let hand_size = self.rules.mods.hand_size();
         let mut cards_appear = false;
         for k in 0..self.flow.hands.len() {
             if self.flow.hands[k].done {
@@ -792,7 +825,7 @@ impl World {
             match h.state.stage {
                 PickStage::Offering => {
                     let n = h.state.hand.len() as u32;
-                    if (n as usize) < HAND_SIZE && h.state.t >= first + step * n {
+                    if (n as usize) < hand_size && h.state.t >= first + step * n {
                         let owned = self.players[pl].cards.clone();
                         let c = draw_slot(content, &mut self.rng.cards, &h.state.hand, &owned);
                         h.state.hand.push(c);
@@ -802,11 +835,11 @@ impl World {
                             card: c,
                         });
                         cards_appear |= n == 0;
-                    } else if h.state.hand.len() == HAND_SIZE
-                        && h.state.t >= first + step * HAND_SIZE as u32
+                    } else if h.state.hand.len() == hand_size
+                        && h.state.t >= first + step * hand_size as u32
                     {
                         h.state.stage = PickStage::Choosing;
-                        h.selected = h.selected.min(HAND_SIZE as u8 - 1);
+                        h.selected = h.selected.min(hand_size as u8 - 1);
                         self.events.push(EventKind::CardSelected {
                             player: pl as u8,
                             slot: h.selected,
@@ -838,7 +871,7 @@ impl World {
         }
         if self.flow.hands.iter().all(|h| h.done) {
             self.flow.hands.clear();
-            return false;
+            return self.next_pick_pass();
         }
         true
     }
@@ -846,7 +879,7 @@ impl World {
     /// One tick of the pick queue. Returns false when the queue is done.
     fn pick_tick(&mut self, content: &Content) -> bool {
         if self.flow.pick.is_none() {
-            if self.flow.pick_queue.is_empty() {
+            if self.flow.pick_queue.is_empty() && !self.next_pick_pass() {
                 return false;
             }
             let pl = self.flow.pick_queue.remove(0);
@@ -895,8 +928,9 @@ impl World {
                 // Slot j spawns at 0.2 s + 0.1 s * j; choosing 0.1 s after the last.
                 let first = ticks(0.2);
                 let step = ticks(0.1);
+                let hand_size = self.rules.mods.hand_size();
                 let n = ps.hand.len() as u32;
-                if (n as usize) < HAND_SIZE && ps.t >= first + step * n {
+                if (n as usize) < hand_size && ps.t >= first + step * n {
                     let owned = self.players[pl].cards.clone();
                     let c = draw_slot(content, &mut self.rng.cards, &ps.hand, &owned);
                     ps.hand.push(c);
@@ -908,9 +942,9 @@ impl World {
                     if n == 0 {
                         self.events.sound(cue::CARDS_APPEAR, V2::ZERO, 1.0);
                     }
-                } else if ps.hand.len() == HAND_SIZE && ps.t >= first + step * HAND_SIZE as u32 {
+                } else if ps.hand.len() == hand_size && ps.t >= first + step * hand_size as u32 {
                     ps.stage = PickStage::Choosing;
-                    let s = (self.flow.selected as usize).min(HAND_SIZE - 1) as u8;
+                    let s = (self.flow.selected as usize).min(hand_size - 1) as u8;
                     self.flow.selected = s;
                     self.events.push(EventKind::CardSelected {
                         player: ps.player,
@@ -930,10 +964,7 @@ impl World {
             }
             PickStage::Gap(left) => {
                 if left <= 1 {
-                    return !self.flow.pick_queue.is_empty() || {
-                        self.flow.pick = None;
-                        false
-                    };
+                    return !self.flow.pick_queue.is_empty() || self.next_pick_pass();
                 }
                 ps.stage = PickStage::Gap(left - 1);
             }

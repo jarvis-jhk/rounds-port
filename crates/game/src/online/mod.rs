@@ -143,6 +143,7 @@ pub fn setup_from_start(content: &Content, ms: &MatchStart) -> MatchSetup {
         rounds_to_win_game: rules.rules.rounds_to_win.max(1),
         pick_phase: rules.rules.pick_phase,
         map_rotation: map_rotation(content, &rules.rules),
+        mods: rules.rules.mods,
     }
 }
 
@@ -155,7 +156,11 @@ mod tests {
         let mut r = NetRules::default();
         r.rules.rounds_to_win = 2;
         r.rules.maps.excluded = vec![3, 4];
+        r.rules.mods.pick_n_cards = Some(rounds_sim::mods::PickNCards::default());
         assert_eq!(NetRules::decode(&r.encode()), r);
+        // Rules from a build without mods decode as "all off".
+        let old = br#"{"rules":{"teams":0,"rounds_to_win":3},"sandbox":false}"#;
+        assert!(NetRules::decode(old).rules.mods.is_vanilla());
         assert_eq!(NetRules::decode(b"garbage"), NetRules::default());
         let f = Face {
             eyes: 3,

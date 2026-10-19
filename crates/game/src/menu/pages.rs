@@ -1,5 +1,5 @@
-//! Main menu, Local (Versus / Sandbox), Options, Controls, Map pool and
-//! the pause menu (ui.md 2.3, 2.4, 2.7, 2.9).
+//! Main menu, Local (Versus / Sandbox), Options, Controls, Map pool, Mods
+//! and the pause menu (ui.md 2.3, 2.4, 2.7, 2.9).
 
 use glam::Vec2;
 
@@ -27,6 +27,7 @@ pub fn initial_pages(sh: &mut Shared) -> Vec<Box<dyn Page>> {
             Box::new(ControlsPage::default()),
         ],
         "maps" => vec![main, local(), Box::new(MapPoolPage::default())],
+        "mods" => vec![main, local(), Box::new(ModsPage::default())],
         "lobby" => vec![main, local(), Box::new(LobbyPage::local(false))],
         "lobby12" => vec![main, local(), Box::new(LobbyPage::demo(sh, 12, false))],
         "pause" => vec![main, Box::new(StartBotsPage(4))],
@@ -834,6 +835,188 @@ fn hint_line(cx: &mut Cx<'_>, s: &str) {
 }
 
 /// Maps the match picks from (lobby setting).
+/// One row of the [`ModsPage`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ModRow {
+    /// On / off of `rounds_sim::mods::ALL[i]`.
+    Toggle(usize),
+    PickNPicks,
+    PickNHand,
+    Back,
+}
+
+/// Built-in mods (docs/MODS.md): one on/off row per mod, its settings
+/// below it while it is on, and the original author in the hint line.
+/// Stored in the lobby rules; online only the host gets here.
+#[derive(Default)]
+pub struct ModsPage {
+    nav: ListNav,
+}
+
+impl ModsPage {
+    fn rows(mods: &rounds_sim::Mods) -> Vec<ModRow> {
+        let mut v = Vec::new();
+        for (i, m) in rounds_sim::mods::ALL.iter().enumerate() {
+            v.push(ModRow::Toggle(i));
+            if m.id == rounds_sim::mods::PICK_N_CARDS.id && mods.pick_n_cards.is_some() {
+                v.push(ModRow::PickNPicks);
+                v.push(ModRow::PickNHand);
+            }
+        }
+        v.push(ModRow::Back);
+        v
+    }
+
+    fn change(mods: &mut rounds_sim::Mods, row: ModRow, dir: i32) {
+        use rounds_sim::mods::{ALL, PICK_N_CARDS, PickNCards};
+        let cyc =
+            |v: u8, hi: u8| -> u8 { (((v as i32 - 1 + dir).rem_euclid(hi as i32)) + 1) as u8 };
+        match row {
+            ModRow::Toggle(i) if ALL[i].id == PICK_N_CARDS.id => {
+                mods.pick_n_cards = match mods.pick_n_cards {
+                    Some(_) => None,
+                    None => Some(PickNCards::default()),
+                };
+            }
+            ModRow::PickNPicks => {
+                if let Some(p) = &mut mods.pick_n_cards {
+                    p.picks = cyc(p.picks, PickNCards::MAX_PICKS);
+                }
+            }
+            ModRow::PickNHand => {
+                if let Some(p) = &mut mods.pick_n_cards {
+                    p.hand_size = cyc(p.hand_size, PickNCards::MAX_HAND);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn text(sh: &Shared, mods: &rounds_sim::Mods, row: ModRow) -> (String, String) {
+        use rounds_sim::mods::{ALL, PICK_N_CARDS};
+        match row {
+            ModRow::Toggle(i) => {
+                let on = ALL[i].id == PICK_N_CARDS.id && mods.pick_n_cards.is_some();
+                (ALL[i].name.to_uppercase(), yes_no(sh, on))
+            }
+            ModRow::PickNPicks => (
+                "    PICKS PER PHASE".into(),
+                mods.pick_n_cards.map_or(1, |p| p.picks).to_string(),
+            ),
+            ModRow::PickNHand => ("    CARDS PER HAND".into(), mods.hand_size().to_string()),
+            ModRow::Back => (sh.up("BUTTON_BACK", "Back"), String::new()),
+        }
+    }
+}
+
+impl Page for ModsPage {
+    fn tick(&mut self, cx: &mut Cx<'_>) -> Action {
+        title(cx, "MODS", 95.0);
+        let rows = Self::rows(&cx.shared.settings.rules.mods);
+        let row_h = 62.0;
+        let top = 220.0;
+        let rects: Vec<Rect> = (0..rows.len())
+            .map(|i| {
+                Rect::new(
+                    Vec2::new(0.0, top + i as f32 * row_h),
+                    Vec2::new(1300.0, row_h * 0.95),
+                )
+            })
+            .collect();
+        let ev = self.nav.update(cx.input, &rects, &vec![true; rows.len()]);
+        if ev.moved {
+            cx.shared.sfx(cx.audio, "UI_Button_Hover");
+        }
+        let mut action = Action::None;
+        let mut changed = None;
+        if let Some((i, d)) = ev.change {
+            changed = Some((rows[i], d));
+            cx.shared.sfx(cx.audio, "UI_Button_Hover");
+        }
+        if let Some(i) = ev.activate {
+            cx.shared.sfx(cx.audio, "UI_Button_Click");
+            match rows[i] {
+                ModRow::Back => action = Action::Pop,
+                r => changed = Some((r, 1)),
+            }
+        }
+        if let Some((r, d)) = changed {
+            Self::change(&mut cx.shared.settings.rules.mods, r, d);
+            cx.shared.settings.save();
+        }
+        if ev.back {
+            action = Action::Pop;
+        }
+        let mods = cx.shared.settings.rules.mods;
+        let rows = Self::rows(&mods);
+        self.nav.focus = self.nav.focus.min(rows.len() - 1);
+        for (i, row) in rows.iter().enumerate() {
+            let r = Rect::new(
+                Vec2::new(0.0, top + i as f32 * row_h),
+                Vec2::new(1300.0, row_h * 0.95),
+            );
+            if i == self.nav.focus {
+                bar(cx.frame, cx.input, r);
+            }
+            let (c, f) = self.nav.style(i, true);
+            let (label, value) = Self::text(cx.shared, &mods, *row);
+            if *row == ModRow::Back {
+                cx.frame.text(label, r.c, 46.0, Vec2::splat(0.5), f, c);
+                continue;
+            }
+            cx.frame.text(
+                label,
+                Vec2::new(-630.0, r.c.y),
+                40.0,
+                Vec2::new(0.0, 0.5),
+                f,
+                c,
+            );
+            let arrows = i == self.nav.focus && !cx.input.mouse_mode;
+            let txt = if arrows {
+                format!("< {value} >")
+            } else {
+                value
+            };
+            cx.frame.text(
+                txt,
+                Vec2::new(650.0, r.c.y),
+                40.0,
+                Vec2::new(1.0, 0.5),
+                f,
+                c,
+            );
+        }
+        // Credit of the focused mod (or of its settings rows).
+        let owner = rows[..=self.nav.focus.min(rows.len() - 1)]
+            .iter()
+            .rev()
+            .find_map(|r| match r {
+                ModRow::Toggle(i) => Some(*i),
+                _ => None,
+            });
+        if let Some(i) = owner
+            && rows[self.nav.focus] != ModRow::Back
+        {
+            let m = &rounds_sim::mods::ALL[i];
+            hint(
+                cx,
+                &format!(
+                    "{} AFTER THE MOD BY {}",
+                    m.about.to_uppercase(),
+                    m.author.to_uppercase()
+                ),
+            );
+        } else {
+            hint(
+                cx,
+                "BUILT-IN VERSIONS OF POPULAR COMMUNITY MODS. ALL OFF = THE ORIGINAL RULES.",
+            );
+        }
+        action
+    }
+}
+
 #[derive(Default)]
 pub struct MapPoolPage {
     focus: usize,

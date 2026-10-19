@@ -5,6 +5,15 @@ items. Newest first.
 
 ## 2026-10-19
 
+- ROADMAP.md: "Popular mods, built in" (Jan's request, relayed by the adhoc
+  lane): the top 20 ROUNDS mods, each optional. Slice 1: `docs/MODS.md`, the
+  Thunderstore survey (downloads snapshot, frameworks and single patches
+  folded in, licences). Slice 2: `rounds_sim::Mods` in `MatchSetup` and the
+  lobby rules (online: travels in `NetRules`, old rules decode as all off),
+  lobby MODS page, `--pick-n`, Pick N Cards as first mod (both pick modes,
+  HUD fan and grid for 1-10 cards). `tests/mods.rs` pins vanilla checksums
+  taken before the change; workspace tests (release, real data), fmt and
+  clippy pass; netsim not run (needs a warpzone build in ext/).
 - ROADMAP.md: "macOS support" milestone after the current priorities
   (requested via the adhoc lane for Jan); replaces the one-line macOS item
   under Later. Roadmap only, no implementation.

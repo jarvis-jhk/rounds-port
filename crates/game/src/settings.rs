@@ -118,6 +118,9 @@ pub struct MatchRules {
     /// How a pick phase deals hands (match-flow.md 16, port decision).
     pub pick_mode: PickModeSetting,
     pub maps: MapPool,
+    /// Built-in mods (docs/MODS.md), all off by default. Online the
+    /// host's set travels with these rules to every peer.
+    pub mods: rounds_sim::Mods,
 }
 
 /// `rounds_sim::PickMode` as a setting.
@@ -151,6 +154,7 @@ impl Default for MatchRules {
             pick_phase: true,
             pick_mode: PickModeSetting::Auto,
             maps: MapPool::default(),
+            mods: rounds_sim::Mods::default(),
         }
     }
 }

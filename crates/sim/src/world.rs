@@ -7,6 +7,7 @@ use crate::flow::Flow;
 use crate::input::PlayerInput;
 use crate::map::MapState;
 use crate::math::{V2, eval_curve, key};
+use crate::mods::Mods;
 use crate::objects::SpawnedObject;
 use crate::physics::Physics;
 use crate::player::Player;
@@ -101,6 +102,9 @@ pub struct MatchSetup {
     pub pick_phase: bool,
     /// Maps to choose from (empty = all maps of the content).
     pub map_rotation: Vec<MapId>,
+    /// Built-in mods (docs/MODS.md); default all off.
+    #[serde(default)]
+    pub mods: Mods,
 }
 
 impl MatchSetup {
@@ -119,6 +123,7 @@ impl MatchSetup {
             rounds_to_win_game: 5,
             pick_phase: true,
             map_rotation: vec![],
+            mods: Mods::default(),
         }
     }
 
@@ -229,6 +234,8 @@ pub struct Rules {
     pub rotation: Vec<MapId>,
     /// See [`World::set_pick_mode`] (default [`PickMode::Auto`]).
     pub pick_mode: PickMode,
+    /// [`MatchSetup::mods`], sanitized.
+    pub mods: Mods,
 }
 
 #[derive(Clone, Debug)]
@@ -287,6 +294,7 @@ impl World {
                 pick_phase: setup.pick_phase,
                 rotation,
                 pick_mode: PickMode::default(),
+                mods: setup.mods.sanitized(),
             },
             flow: Flow::default(),
             players,
@@ -433,6 +441,9 @@ impl World {
         }
         h.f32(self.time.game_over_time);
         h.u32(self.rules.pick_mode as u32);
+        if !self.rules.mods.is_vanilla() {
+            self.rules.mods.hash_into(&mut h);
+        }
         self.flow.hash_into(&mut h);
         for p in &self.pending_forfeits {
             h.u32(0xF0F0_0000 | *p as u32);

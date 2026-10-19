@@ -32,6 +32,8 @@ const SLOTS: [(f32, f32, f32); 5] = [
     (25.0, 0.0, -15.0),
 ];
 const CHOICE_ROOT: Vec2 = Vec2::new(0.0, -1.5);
+/// Most cards a hand can have (the Pick N Cards mod, docs/MODS.md).
+const MAX_HAND: usize = rounds_sim::mods::PickNCards::MAX_HAND as usize;
 const FACE_POS: Vec2 = Vec2::new(0.0, -18.0);
 const FACE_SCALE: f32 = 33.0;
 
@@ -94,10 +96,10 @@ pub struct Hud {
     arts: HashMap<CardId, Option<ArtAnim>>,
     /// HUD time the card art animators were last advanced to.
     art_time: f32,
-    slot_scale: [f32; 5],
-    slot_vel: [f32; 5],
+    slot_scale: [f32; MAX_HAND],
+    slot_vel: [f32; MAX_HAND],
     /// Simultaneous picks: card scale per player and slot.
-    sim_scale: [[f32; 5]; 12],
+    sim_scale: [[f32; MAX_HAND]; 12],
     hands: [(Vec2, Vec2); 2],
     pick_player: Option<u8>,
     face_in: f32,
@@ -120,9 +122,9 @@ impl Hud {
             card_base: None,
             arts: HashMap::new(),
             art_time: 0.0,
-            slot_scale: [0.0; 5],
-            slot_vel: [0.0; 5],
-            sim_scale: [[0.0; 5]; 12],
+            slot_scale: [0.0; MAX_HAND],
+            slot_vel: [0.0; MAX_HAND],
+            sim_scale: [[0.0; MAX_HAND]; 12],
             hands: [
                 (Vec2::new(-12.0, -8.0), Vec2::ZERO),
                 (Vec2::new(12.0, -8.0), Vec2::ZERO),
@@ -216,7 +218,7 @@ impl Hud {
             K::PickStarted { .. } | K::CardPicked { .. } if w.simultaneous_pick() => {}
             K::PickStarted { player } => {
                 self.pick_player = Some(*player);
-                self.slot_scale = [0.0; 5];
+                self.slot_scale = [0.0; MAX_HAND];
                 self.thrown.clear();
             }
             K::CardPicked { slot, card, .. } => {
@@ -225,8 +227,9 @@ impl Hud {
                     .pick()
                     .map(|p| p.hand.clone())
                     .unwrap_or_else(|| self.last_hand.clone());
+                let n = w.rules().mods.hand_size();
                 for (i, c) in hand.iter().enumerate() {
-                    let (pos, rot) = slot_pose(i);
+                    let (pos, rot) = slot_pose(i, n);
                     let picked = i == *slot as usize;
                     let away = (pos - FACE_POS).normalize_or(Vec2::Y);
                     self.thrown.push(Thrown {
@@ -244,7 +247,7 @@ impl Hud {
                         } else {
                             self.rng.range(-4.0, 4.0)
                         },
-                        scale: if picked { 1.15 } else { 0.9 },
+                        scale: if picked { 1.15 } else { 0.9 } * hand_scale(n),
                         life: if picked {
                             0.0
                         } else {
@@ -254,7 +257,7 @@ impl Hud {
                     });
                 }
                 self.pick_shake =
-                    (FACE_POS - slot_pose(*slot as usize).0).normalize_or(Vec2::NEG_Y) * 2.0;
+                    (FACE_POS - slot_pose(*slot as usize, n).0).normalize_or(Vec2::NEG_Y) * 2.0;
             }
             K::PointWon { .. } | K::RoundWon { .. } | K::GameWon { .. } => {
                 self.seq_start = Some(e.frame);
@@ -303,7 +306,7 @@ impl Hud {
             for h in w.pick_hands() {
                 let pi = (h.state.player as usize).min(11);
                 let choosing = matches!(h.state.stage, PickStage::Choosing | PickStage::Offering);
-                for i in 0..5 {
+                for i in 0..MAX_HAND {
                     let target = if i >= h.state.hand.len() || h.done {
                         0.0
                     } else if h.picked == Some(i as u8) {
@@ -320,14 +323,14 @@ impl Hud {
                 }
             }
         } else {
-            self.sim_scale = [[0.0; 5]; 12];
+            self.sim_scale = [[0.0; MAX_HAND]; 12];
         }
         // Card choice springs (ScaleShake target 1.15 / 0.9).
         if let Some(pick) = w.pick().filter(|_| !w.simultaneous_pick()) {
             self.last_hand = pick.hand.clone();
             let sel = w.pick_selected() as usize;
             let choosing = !matches!(pick.stage, PickStage::Ending(_) | PickStage::Gap(_));
-            for i in 0..5 {
+            for i in 0..MAX_HAND {
                 let target = if i >= pick.hand.len() || !choosing {
                     0.0
                 } else if i == sel {
@@ -342,9 +345,14 @@ impl Hud {
             }
             self.face_in = (self.face_in + real / 0.3).min(1.0);
             // Hands (9.5): spring to the selected slot.
-            let (sp, rot) = slot_pose(sel);
+            let n = w.rules().mods.hand_size();
+            let (sp, rot) = slot_pose(sel, n);
             let target = sp + Vec2::from_angle(rot.to_radians()).rotate(Vec2::new(0.0, -6.5));
-            let active = if sel < 2 { 0 } else { 1 };
+            let active = if (sel as f32) < (n as f32 - 1.0) * 0.5 {
+                0
+            } else {
+                1
+            };
             for (h, (pos, vel)) in self.hands.iter_mut().enumerate() {
                 let rest = FACE_POS + Vec2::new(if h == 0 { -13.0 } else { 13.0 }, 7.0);
                 let sway = Vec2::new(
@@ -593,11 +601,12 @@ impl Hud {
                     if !choosing {
                         break;
                     }
-                    let k = self.slot_scale[i];
+                    let n = w.rules().mods.hand_size();
+                    let k = self.slot_scale[i] * hand_scale(n);
                     if k <= 0.01 {
                         continue;
                     }
-                    let (pos, rot) = slot_pose(i);
+                    let (pos, rot) = slot_pose(i, n);
                     let tf = Affine2::from_scale_angle_translation(
                         Vec2::splat(k),
                         rot.to_radians(),
@@ -648,6 +657,7 @@ impl Hud {
     fn draw_hands(&self, w: &World, content: &Content, a: &PlayAssets, list: &mut DrawList) {
         let hands = w.pick_hands();
         let n = hands.len().max(1);
+        let slots = w.rules().mods.hand_size().max(5);
         super::dim(list, 3_900_000, 0.72);
         // Grid: the column count that gives the biggest cards.
         let (area_w, area_h) = (68.0f32, 36.0f32);
@@ -656,7 +666,7 @@ impl Hud {
         for cols in 1..=n {
             let rows = n.div_ceil(cols);
             let (pw, ph) = (area_w / cols as f32, area_h / rows as f32);
-            let k = ((pw - 4.0) / (5.0 * card_w)).min((ph - 1.5) / (card_h * 1.1));
+            let k = ((pw - 4.0) / (slots as f32 * card_w)).min((ph - 1.5) / (card_h * 1.1));
             if k > best.1 {
                 best = (cols, k);
             }
@@ -754,7 +764,7 @@ impl Hud {
                 };
                 let pos = centre + Vec2::new(x, -0.4 + lift);
                 let tf = Affine2::from_scale_angle_translation(Vec2::splat(k * sk), 0.0, pos);
-                let idx = (hi * 5 + i) as i32;
+                let idx = (hi * MAX_HAND + i) as i32;
                 // Selected card above its neighbours.
                 let sort = 4_000_000 + idx * 2_000 + if selected { 1_000_000 } else { 0 };
                 self.draw_card(
@@ -1205,9 +1215,32 @@ fn tf_angle(tf: Affine2) -> f32 {
     tf.matrix2.x_axis.y.atan2(tf.matrix2.x_axis.x)
 }
 
-fn slot_pose(i: usize) -> (Vec2, f32) {
-    let (x, y, r) = SLOTS[i.min(4)];
-    (CHOICE_ROOT + Vec2::new(x, y), r)
+/// Pose of slot `i` in a hand of `n` cards: the original's five slots for
+/// five cards; other hand sizes (Pick N Cards) on the same arc, spaced like
+/// the original up to five cards and squeezed to its width beyond.
+fn slot_pose(i: usize, n: usize) -> (Vec2, f32) {
+    if n == SLOTS.len() || n == 0 {
+        let (x, y, r) = SLOTS[i.min(SLOTS.len() - 1)];
+        return (CHOICE_ROOT + Vec2::new(x, y), r);
+    }
+    let half = 25.0 * ((n as f32 - 1.0) / 4.0).min(1.0);
+    let u = if n == 1 {
+        0.0
+    } else {
+        (i.min(n - 1) as f32 / (n as f32 - 1.0)) * 2.0 - 1.0
+    };
+    let x = u * half;
+    let y = 9.66 * (1.0 - (x / 25.0) * (x / 25.0));
+    (CHOICE_ROOT + Vec2::new(x, y), -15.0 * x / 25.0)
+}
+
+/// Card scale of a hand of `n` cards (smaller beyond the original five).
+fn hand_scale(n: usize) -> f32 {
+    if n <= SLOTS.len() {
+        1.0
+    } else {
+        (SLOTS.len() as f32 / n as f32).max(0.5)
+    }
 }
 
 /// Team colour: the skin of the team's first member (match-flow.md 2.2).
@@ -1321,5 +1354,33 @@ fn draw_face(
             * Affine2::from_translation(off)
             * Affine2::from_scale(Vec2::splat(item.scale * 1.05));
         list.sprite(Layer::World, sort + 2, item.sprite.sprite(t, item.color));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slot_poses() {
+        // Five cards: exactly the original's slots.
+        for (i, (x, y, r)) in SLOTS.iter().enumerate() {
+            assert_eq!(slot_pose(i, 5), (CHOICE_ROOT + Vec2::new(*x, *y), *r));
+        }
+        assert_eq!(hand_scale(5), 1.0);
+        // Other sizes: symmetric, left to right, within the original's width.
+        for n in 1..=MAX_HAND {
+            for i in 0..n {
+                let (p, r) = slot_pose(i, n);
+                let (q, s) = slot_pose(n - 1 - i, n);
+                assert!(
+                    (p.x + q.x).abs() < 1e-4 && (p.y - q.y).abs() < 1e-4 && (r + s).abs() < 1e-4
+                );
+                assert!(p.x.abs() <= 25.0 + 1e-4);
+                if i > 0 {
+                    assert!(slot_pose(i - 1, n).0.x < p.x);
+                }
+            }
+        }
     }
 }

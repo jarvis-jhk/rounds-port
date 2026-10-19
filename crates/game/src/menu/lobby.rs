@@ -69,16 +69,18 @@ enum Setting {
     Rounds,
     Picks,
     Maps,
+    Mods,
     AddBot,
     RemoveBot,
 }
 
-const SETTINGS: [Setting; 7] = [
+const SETTINGS: [Setting; 8] = [
     Setting::Mode,
     Setting::Points,
     Setting::Rounds,
     Setting::Picks,
     Setting::Maps,
+    Setting::Mods,
     Setting::AddBot,
     Setting::RemoveBot,
 ];
@@ -352,6 +354,10 @@ impl LobbyPage {
                 cx.shared.settings.save();
                 return Action::Push(Box::new(super::pages::MapPoolPage::default()));
             }
+            Setting::Mods => {
+                cx.shared.settings.save();
+                return Action::Push(Box::new(super::pages::ModsPage::default()));
+            }
             Setting::AddBot => {
                 let sh = &*cx.shared;
                 self.add(sh, Who::Bot);
@@ -399,6 +405,17 @@ impl LobbyPage {
                 (
                     "MAPS".into(),
                     format!("{} / {}", n - r.maps.excluded.len().min(n), n),
+                )
+            }
+            Setting::Mods => {
+                let on = r.mods.enabled_count();
+                (
+                    "MODS".into(),
+                    if on == 0 {
+                        sh.up("OPTION_NO", "No")
+                    } else {
+                        format!("{on} / {}", rounds_sim::mods::ALL.len())
+                    },
                 )
             }
             Setting::AddBot => ("".into(), "+ BOT".into()),
@@ -572,6 +589,7 @@ impl LobbyPage {
             rounds_to_win_game: rules.rounds_to_win,
             pick_phase: rules.pick_phase,
             map_rotation: online::map_rotation(&sh.content, rules),
+            mods: rules.mods,
         };
         Launch {
             setup,
@@ -1232,10 +1250,16 @@ impl Page for LobbyPage {
                     Font::Regular,
                     style::GREY,
                 );
+                // Long values (FREE-FOR-ALL) shrink to fit the item.
+                let size = if value.chars().count() > 10 {
+                    28.0
+                } else {
+                    34.0
+                };
                 cx.frame.text(
                     value,
                     r.c + Vec2::new(0.0, 14.0),
-                    34.0,
+                    size,
                     Vec2::splat(0.5),
                     if focused { Font::Bold } else { Font::Light },
                     if grey { style::GREY } else { style::TEXT },
