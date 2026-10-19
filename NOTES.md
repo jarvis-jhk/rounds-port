@@ -5,6 +5,11 @@ items. Newest first.
 
 ## 2026-10-19
 
+- Warpzone descriptor: `steamgriddb = 5281211` (launcher library tile, asked
+  for by the warpzone lane for Warpzone 0.1.3). Servers <= 0.1.2 reject the
+  field, so `check-games` needs a 0.1.3 dev server. The live copy on vtt and
+  `games/rounds-port.toml` in jarvis-jhk/warpzone are not reachable from this
+  lane: asked the warpzone lane to sync them once 0.1.3 runs on vtt.
 - ROADMAP.md: "Popular mods, built in" (Jan's request, relayed by the adhoc
   lane): the top 20 ROUNDS mods, each optional. Slice 1: `docs/MODS.md`, the
   Thunderstore survey (downloads snapshot, frameworks and single patches

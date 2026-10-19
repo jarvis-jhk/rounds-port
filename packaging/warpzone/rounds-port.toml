@@ -15,6 +15,8 @@ Up to twelve players in any mix: twelve on one screen with controllers, twelve m
 Warpzone brings public and private rooms, join codes, invite links and NAT traversal; online play uses rollback netcode, so remote players feel as responsive as local ones."""
 homepage = "https://github.com/jarvis-jhk/rounds-port"
 accent = "#e8603c"
+# Launcher library tile (Warpzone >= 0.1.3; older servers reject the field).
+steamgriddb = 5281211   # ROUNDS, https://www.steamgriddb.com/game/5281211
 motif = "arena"
 tier = 2
 local_players = 12
