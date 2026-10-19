@@ -51,6 +51,25 @@ A macOS build alongside Linux and Windows, after the current priorities.
   - Platform paths written but never run on a Mac: system font lookup
     (`sysfonts.rs`), the Steam root scan (`paths.rs`), crash reports.
 
+## Popular mods, built in
+
+Jan, 2026-10-19: the 20 most popular ROUNDS mods, integrated directly and
+each one optional. The list, the selection rules and the slices are in
+`docs/MODS.md`.
+
+- **Clean room**: reimplemented from documented and observable behaviour,
+  never the mod's code; its art or data only where its licence allows it;
+  every original author credited.
+- **Optional**: every mod off by default and toggleable on its own in the
+  lobby, per match; with all of them off the simulation stays bit-identical
+  to vanilla.
+- **Online**: the host's enabled-mod set is part of the match setup, so
+  rollback peers agree.
+- **Tests**: one per mod, that the toggle changes behaviour and that off
+  equals vanilla.
+- **Slices**: survey (done), mod framework with Pick N Cards (done), rule
+  mods, client-side QoL, card packs one by one, custom maps.
+
 ## Later
 
 - **Warpzone tier 3**: a ranked queue (1v1 and 2v2) that reports placements
