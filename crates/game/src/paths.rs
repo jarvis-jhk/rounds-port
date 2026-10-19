@@ -50,8 +50,90 @@ fn home() -> Option<PathBuf> {
 
 /// Whether `dir` looks like a ROUNDS install (or its `ROUNDS_Data` dir).
 pub fn is_rounds_dir(dir: &Path) -> bool {
-    dir.join("ROUNDS_Data").join("globalgamemanagers").is_file()
-        || dir.join("globalgamemanagers").is_file() && dir.join("level0").is_file()
+    unity_data_dir(dir).is_some()
+}
+
+/// The Unity data dir of an install: `dir` itself when it holds
+/// `globalgamemanagers` and `level0`, else its `*_Data` child (any case: the
+/// install may have been copied from a case-insensitive file system).
+fn unity_data_dir(dir: &Path) -> Option<PathBuf> {
+    if dir.join("globalgamemanagers").is_file() && dir.join("level0").is_file() {
+        return Some(dir.to_path_buf());
+    }
+    let exact = dir.join("ROUNDS_Data");
+    if exact.join("globalgamemanagers").is_file() {
+        return Some(exact);
+    }
+    let mut subs: Vec<PathBuf> = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.to_ascii_lowercase().ends_with("_data"))
+                && p.join("globalgamemanagers").is_file()
+        })
+        .collect();
+    subs.sort();
+    subs.into_iter().next()
+}
+
+/// Why `dir` is not a usable install, for the "not found" message.
+fn why_not(dir: &Path) -> &'static str {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return if dir.exists() {
+            "cannot be read"
+        } else {
+            "does not exist"
+        };
+    };
+    let names: Vec<String> = rd
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().to_ascii_lowercase())
+        .collect();
+    if names.is_empty() {
+        "is empty"
+    } else if names.iter().any(|n| n.ends_with("_data")) {
+        "has ROUNDS_Data but no globalgamemanagers in it: incomplete download? \
+         Let Steam finish or verify the game files"
+    } else if names.iter().any(|n| n == "rounds.exe") {
+        "has ROUNDS.exe but no ROUNDS_Data folder: incomplete download? \
+         Let Steam finish or verify the game files"
+    } else {
+        "has no ROUNDS_Data folder"
+    }
+}
+
+/// `~/x` → `$HOME/x` (paths from launchers and config files are not always
+/// expanded by a shell).
+fn expand_tilde(p: &Path) -> PathBuf {
+    if let Ok(rest) = p.strip_prefix("~")
+        && let Some(h) = home()
+    {
+        return h.join(rest);
+    }
+    p.to_path_buf()
+}
+
+/// The install dir Steam's manifest for ROUNDS names in `lib`
+/// (`steamapps/appmanifest_<id>.acf`, `"installdir"`), if any.
+fn manifest_install_dir(lib: &Path) -> Option<String> {
+    let acf = lib
+        .join("steamapps")
+        .join(format!("appmanifest_{ROUNDS_APP_ID}.acf"));
+    let text = std::fs::read_to_string(acf).ok()?;
+    acf_value(&text, "installdir")
+}
+
+/// The value of the first `"key" "value"` line in a Steam `.acf`/`.vdf`.
+fn acf_value(text: &str, key: &str) -> Option<String> {
+    let quoted = format!("\"{key}\"");
+    text.lines().find_map(|l| {
+        let rest = l.trim().strip_prefix(quoted.as_str())?;
+        let v = rest.trim().strip_prefix('"')?.strip_suffix('"')?;
+        (!v.is_empty()).then(|| v.to_string())
+    })
 }
 
 /// Where an install was found.
@@ -67,10 +149,11 @@ pub struct Install {
 pub fn find_install(cli: Option<&Path>) -> Result<Install, Vec<String>> {
     let mut tried = Vec::new();
     let mut check = |dir: PathBuf, source: String| -> Option<Install> {
+        let dir = expand_tilde(&dir);
         if is_rounds_dir(&dir) {
             Some(Install { dir, source })
         } else {
-            tried.push(format!("{} ({source})", dir.display()));
+            tried.push(format!("{} ({source}): {}", dir.display(), why_not(&dir)));
             None
         }
     };
@@ -87,9 +170,18 @@ pub fn find_install(cli: Option<&Path>) -> Result<Install, Vec<String>> {
         }
     }
     for lib in steam_libraries() {
-        let dir = lib.join("steamapps").join("common").join("ROUNDS");
-        if let Some(i) = check(dir, format!("Steam library {}", lib.display())) {
-            return Ok(i);
+        let common = lib.join("steamapps").join("common");
+        let mut names = vec!["ROUNDS".to_string()];
+        if let Some(d) = manifest_install_dir(&lib).filter(|d| d != "ROUNDS") {
+            names.insert(0, d);
+        }
+        for name in names {
+            if let Some(i) = check(
+                common.join(name),
+                format!("Steam library {}", lib.display()),
+            ) {
+                return Ok(i);
+            }
         }
     }
     Err(tried)
@@ -325,6 +417,47 @@ mod tests {
         let vdf = r#""LibraryFolders" { "TimeNextStatsReport" "123" "1" "E:\\Games\\Steam" }"#;
         let libs = parse_library_folders(vdf);
         assert_eq!(libs, vec![(r"E:\Games\Steam".to_string(), vec![])]);
+    }
+
+    #[test]
+    fn acf_install_dir() {
+        let acf =
+            "\"AppState\"\n{\n\t\"appid\"\t\t\"1557740\"\n\t\"installdir\"\t\t\"ROUNDS\"\n}\n";
+        assert_eq!(acf_value(acf, "installdir").as_deref(), Some("ROUNDS"));
+        assert_eq!(acf_value(acf, "appid").as_deref(), Some("1557740"));
+        assert_eq!(acf_value(acf, "name"), None);
+    }
+
+    #[test]
+    fn install_detection_and_diagnosis() {
+        let base = std::env::temp_dir().join(format!("rounds-port-paths-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let missing = base.join("missing");
+        assert!(why_not(&missing).contains("does not exist"));
+
+        // Only the exe: an unfinished download.
+        let partial = base.join("partial");
+        std::fs::create_dir_all(&partial).unwrap();
+        std::fs::write(partial.join("ROUNDS.exe"), b"").unwrap();
+        assert!(!is_rounds_dir(&partial));
+        assert!(why_not(&partial).contains("no ROUNDS_Data"));
+
+        // Data dir with another case.
+        let odd = base.join("odd");
+        std::fs::create_dir_all(odd.join("Rounds_Data")).unwrap();
+        std::fs::write(odd.join("Rounds_Data/globalgamemanagers"), b"").unwrap();
+        assert!(is_rounds_dir(&odd));
+        assert_eq!(unity_data_dir(&odd), Some(odd.join("Rounds_Data")));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn tilde_expansion() {
+        let p = Path::new("/abs/x");
+        assert_eq!(expand_tilde(p), p);
+        if let Some(h) = home() {
+            assert_eq!(expand_tilde(Path::new("~/a/b")), h.join("a/b"));
+        }
     }
 
     #[test]

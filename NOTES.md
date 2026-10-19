@@ -5,6 +5,16 @@ items. Newest first.
 
 ## 2026-10-19
 
+- Launcher crash report (exit 1 after 0 s, `--import --game
+  ~/.local/share/Steam/steamapps/common/ROUNDS`, Linux, probably a Steam
+  Deck with an SD-card library): "ROUNDS is not installed". The launcher had
+  found that folder, but its check is case-insensitive and also accepts a
+  folder with only `ROUNDS.exe`; ours wanted exactly `ROUNDS_Data`. Now:
+  `*_Data` matched in any case (game and `AssetDir::open`), the install dir
+  from Steam's `appmanifest_1557740.acf` is tried, `~/` is expanded, and the
+  error says per path why it failed (missing, empty, exe but no data folder →
+  "incomplete download? verify the game files"). The exact cause on the
+  reporter's machine is unknown; the next report will say.
 - Warpzone descriptor: `steamgriddb = 5281211` (launcher library tile, asked
   for by the warpzone lane for Warpzone 0.1.3). Servers <= 0.1.2 reject the
   field, so `check-games` needs a 0.1.3 dev server. The live copy on vtt and

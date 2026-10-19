@@ -127,7 +127,7 @@ impl AssetDir {
                     p.is_dir()
                         && p.file_name()
                             .and_then(|n| n.to_str())
-                            .is_some_and(|n| n.ends_with("_Data"))
+                            .is_some_and(|n| n.to_ascii_lowercase().ends_with("_data"))
                         && p.join("globalgamemanagers").is_file()
                 })
                 .ok_or_else(|| Error::NotFound(format!("no Unity data dir in {}", dir.display())))?
