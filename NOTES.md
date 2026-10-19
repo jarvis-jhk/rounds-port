@@ -3,6 +3,12 @@
 Running log of the project's maintenance: decisions, CI, releases, open
 items. Newest first.
 
+## 2026-10-19
+
+- ROADMAP.md: "macOS support" milestone after the current priorities
+  (requested via the adhoc lane for Jan); replaces the one-line macOS item
+  under Later. Roadmap only, no implementation.
+
 ## 2026-10-17
 
 - Taken over as a maintained project. CI green on b9b2791; v0.1.0
